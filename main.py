@@ -9,12 +9,78 @@ app = FastAPI()
 
 @app.get("/player/{state}/{city}/{school}/{name}")
 async def get_player_data(name, school, city, state):
-    print(name)
-    print(school)
-    print(city)
-    print(state)
-    data = get_athlete_data(name, school, city, state)
-    return {"success": True, "data": data}
+    try:
+        data = get_athlete_data(name, school, city, state)
+
+        # Get latest season
+        latest_season = data["games"]["Basketball"]["seasons"][0]
+
+        # Get featured stats
+        featured_stats = latest_season["featured_stats"]
+
+        # Get Total Stats
+        stats = latest_season["stats"]
+        for stat in stats:
+            if stat["title"] == "Totals":
+                total_stats = stat["data"]
+
+        # Calculate average per game by calculation total and divide by total games
+        t_min = 0
+        t_pts = 0
+        t_oreb = 0
+        t_dreb = 0
+        t_reb = 0
+        t_ast = 0
+        t_stl = 0
+        t_blk = 0
+        t_to = 0
+        t_pf = 0
+
+        total_games = 0
+
+        for game in total_stats:
+            t_min += int(game["min"])
+            t_pts += int(game["pts"])
+            t_oreb += int(game["oreb"])
+            t_dreb += int(game["dreb"])
+            t_reb += int(game["reb"])
+            t_ast += int(game["ast"])
+            t_stl += int(game["stl"])
+            t_blk += int(game["blk"])
+            t_to += int(game["to"])
+            t_pf += int(game["pf"])
+            total_games += 1
+
+        # Final response json
+        resp = {
+            "playingPosition": data["player_grade"],
+            "improved": True,
+            "pgs": {
+                "GP": featured_stats["games_played"],
+                "PPG": featured_stats["points_per_game"],
+                "APG": featured_stats["assists_per_game"],
+                "RPG": featured_stats["rebounds_per_game"],
+                "SPG": featured_stats["steals_per_game"],
+                "BPG": featured_stats["blocks_per_game"],
+            },
+            "playersKpis": {
+                "MIN": "{:.2f}".format(float(t_min / total_games)),
+                "PTS": "{:.2f}".format(float(t_pts / total_games)),
+                "OREB": "{:.2f}".format(float(t_oreb / total_games)),
+                "DREB": "{:.2f}".format(float(t_dreb / total_games)),
+                "REB": "{:.2f}".format(float(t_reb / total_games)),
+                "AST": "{:.2f}".format(float(t_ast / total_games)),
+                "STL": "{:.2f}".format(float(t_stl / total_games)),
+                "BLK": "{:.2f}".format(float(t_blk / total_games)),
+                "TO": "{:.2f}".format(float(t_to / total_games)),
+                "PF": "{:.2f}".format(float(t_pf / total_games))
+            }
+        }
+
+        return {"success": True, "data": resp}
+    except:
+        return {"success": False, "data": {}, "message": "Something went wrong"}
+
 
 cookies = {
     '_ga': 'GA1.2.69878116.1648575323',
@@ -257,4 +323,3 @@ def get_athlete_data(athlete_name, athlete_school, athlete_city, athlete_state):
         print("No match found for this Athlete")
 
     return this_athlete_dict
-
