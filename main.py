@@ -18,6 +18,22 @@ async def get_player_data(name, school, city, state):
         # Get featured stats
         featured_stats = latest_season["featured_stats"]
 
+        # Get featured stats keys
+        featured_stats_keys = list(featured_stats.keys())
+        featured_keys = []
+
+        # Iterate keys and crete abbrevation
+        for stats_key in featured_stats_keys:
+            words = stats_key.split("_")
+            letters = [word[0] for word in words]
+            featured_keys.append(("".join(letters)).upper())
+
+        # Create a dictionary with featured data and abrevated keys
+        featured_stats_data = {}
+
+        for i in range(len(featured_stats_keys)):
+            featured_stats_data[featured_keys[i]] = featured_stats[featured_stats_keys[i]]
+
         # Get Total Stats
         stats = latest_season["stats"]
         for stat in stats:
@@ -39,30 +55,23 @@ async def get_player_data(name, school, city, state):
         total_games = 0
 
         for game in total_stats:
-            t_min += int(game["min"])
-            t_pts += int(game["pts"])
-            t_oreb += int(game["oreb"])
-            t_dreb += int(game["dreb"])
-            t_reb += int(game["reb"])
-            t_ast += int(game["ast"])
-            t_stl += int(game["stl"])
-            t_blk += int(game["blk"])
-            t_to += int(game["to"])
-            t_pf += int(game["pf"])
+            t_min += int(game["min"] or 0)
+            t_pts += int(game["pts"] or 0)
+            t_oreb += int(game["oreb"] or 0)
+            t_dreb += int(game["dreb"] or 0)
+            t_reb += int(game["reb"] or 0)
+            t_ast += int(game["ast"] or 0)
+            t_stl += int(game["stl"] or 0)
+            t_blk += int(game["blk"] or 0)
+            t_to += int(game["to"] or 0)
+            t_pf += int(game["pf"] or 0)
             total_games += 1
 
         # Final response json
         resp = {
             "playingPosition": data["player_grade"],
             "improved": True,
-            "pgs": {
-                "GP": featured_stats["games_played"],
-                "PPG": featured_stats["points_per_game"],
-                "APG": featured_stats["assists_per_game"],
-                "RPG": featured_stats["rebounds_per_game"],
-                "SPG": featured_stats["steals_per_game"],
-                "BPG": featured_stats["blocks_per_game"],
-            },
+            "pgs": featured_stats_data,
             "playersKpis": {
                 "MIN": "{:.2f}".format(float(t_min / total_games)),
                 "PTS": "{:.2f}".format(float(t_pts / total_games)),
@@ -78,7 +87,8 @@ async def get_player_data(name, school, city, state):
         }
 
         return {"success": True, "data": resp}
-    except:
+    except Exception:
+        print(Exception.with_traceback())
         return {"success": False, "data": {}, "message": "Something went wrong"}
 
 
