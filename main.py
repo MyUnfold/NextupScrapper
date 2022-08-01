@@ -10,83 +10,109 @@ app = FastAPI()
 @app.get("/player/{state}/{city}/{school}/{name}")
 async def get_player_data(name, school, city, state):
     try:
-        data = get_athlete_data(name, school, city, state)
+        url = f'https://www.maxpreps.com/m/feeds/search.ashx?type=athlete&search={name}&state={state}&gendersport=boys,basketball'
+        res = requests.get(url)
+        data = json.loads(res.text)
+        if len(data["response"]["results"]) == 1:
+            athlete_url = data["response"]["results"][0]["url"]
+        else:
+            for record in data["response"]["results"]:
+                if (record["mostrecentSchool"]["name"]).lower() == school.lower() and (record["mostrecentSchool"]["city"]).lower() == city.lower() :
+                    athlete_url = record["url"]
+                    break
+
+        data = get_athlete_info(athlete_url)
+
+
+        # data = get_athlete_data(name, school, city, state)
 
         # Get latest season
-        latest_season = data["games"]["Basketball"]["seasons"][0]
+        if "Basketball" in data["games"].keys():
+            latest_season = data["games"]["Basketball"]["seasons"][0]
 
-        # Get featured stats
-        featured_stats = latest_season["featured_stats"]
+            # Get featured stats
+            featured_stats = latest_season["featured_stats"]
 
-        # Get featured stats keys
-        featured_stats_keys = list(featured_stats.keys())
-        featured_keys = []
+            # Get featured stats keys
+            featured_stats_keys = list(featured_stats.keys())
+            featured_keys = []
 
-        # Iterate keys and crete abbrevation
-        for stats_key in featured_stats_keys:
-            words = stats_key.split("_")
-            letters = [word[0] for word in words]
-            featured_keys.append(("".join(letters)).upper())
+            # Iterate keys and crete abbrevation
+            for stats_key in featured_stats_keys:
+                words = stats_key.split("_")
+                letters = [word[0] for word in words]
+                featured_keys.append(("".join(letters)).upper())
 
-        # Create a dictionary with featured data and abrevated keys
-        featured_stats_data = {}
+            # Create a dictionary with featured data and abrevated keys
+            featured_stats_data = {}
 
-        for i in range(len(featured_stats_keys)):
-            featured_stats_data[featured_keys[i]] = featured_stats[featured_stats_keys[i]]
+            for i in range(len(featured_stats_keys)):
+                featured_stats_data[featured_keys[i]] = featured_stats[featured_stats_keys[i]]
 
-        # Get Total Stats
-        stats = latest_season["stats"]
-        for stat in stats:
-            if stat["title"] == "Totals":
-                total_stats = stat["data"]
+            # Get Total Stats
+            stats = latest_season["stats"]
+            for stat in stats:
+                if stat["title"] == "Totals":
+                    total_stats = stat["data"]
 
-        # Calculate average per game by calculation total and divide by total games
-        t_min = 0
-        t_pts = 0
-        t_oreb = 0
-        t_dreb = 0
-        t_reb = 0
-        t_ast = 0
-        t_stl = 0
-        t_blk = 0
-        t_to = 0
-        t_pf = 0
+            # Calculate average per game by calculation total and divide by total games
+            t_min = 0
+            t_pts = 0
+            t_oreb = 0
+            t_dreb = 0
+            t_reb = 0
+            t_ast = 0
+            t_stl = 0
+            t_blk = 0
+            t_to = 0
+            t_pf = 0
 
-        total_games = 0
+            total_games = 0
 
-        for game in total_stats:
-            t_min += int(game["min"] or 0)
-            t_pts += int(game["pts"] or 0)
-            t_oreb += int(game["oreb"] or 0)
-            t_dreb += int(game["dreb"] or 0)
-            t_reb += int(game["reb"] or 0)
-            t_ast += int(game["ast"] or 0)
-            t_stl += int(game["stl"] or 0)
-            t_blk += int(game["blk"] or 0)
-            t_to += int(game["to"] or 0)
-            t_pf += int(game["pf"] or 0)
-            total_games += 1
+            for game in total_stats:
+                t_min += int(game["min"] or 0)
+                t_pts += int(game["pts"] or 0)
+                t_oreb += int(game["oreb"] or 0)
+                t_dreb += int(game["dreb"] or 0)
+                t_reb += int(game["reb"] or 0)
+                t_ast += int(game["ast"] or 0)
+                t_stl += int(game["stl"] or 0)
+                t_blk += int(game["blk"] or 0)
+                t_to += int(game["to"] or 0)
+                t_pf += int(game["pf"] or 0)
+                total_games += 1
 
-        # Final response json
-        resp = {
-            "playingPosition": data["player_grade"],
-            "improved": True,
-            "pgs": featured_stats_data,
-            "playersKpis": {
-                "MIN": "{:.2f}".format(float(t_min / total_games)),
-                "PTS": "{:.2f}".format(float(t_pts / total_games)),
-                "OREB": "{:.2f}".format(float(t_oreb / total_games)),
-                "DREB": "{:.2f}".format(float(t_dreb / total_games)),
-                "REB": "{:.2f}".format(float(t_reb / total_games)),
-                "AST": "{:.2f}".format(float(t_ast / total_games)),
-                "STL": "{:.2f}".format(float(t_stl / total_games)),
-                "BLK": "{:.2f}".format(float(t_blk / total_games)),
-                "TO": "{:.2f}".format(float(t_to / total_games)),
-                "PF": "{:.2f}".format(float(t_pf / total_games))
-            }
-        }
+            if total_games > 0:
 
-        return {"success": True, "data": resp}
+                # Final response json
+                resp = {
+                    "playingPosition": data["player_grade"],
+                    "improved": True,
+                    "pgs": featured_stats_data,
+                    "playersKpis": {
+                        "MIN": "{:.2f}".format(float(t_min / total_games)),
+                        "PTS": "{:.2f}".format(float(t_pts / total_games)),
+                        "OREB": "{:.2f}".format(float(t_oreb / total_games)),
+                        "DREB": "{:.2f}".format(float(t_dreb / total_games)),
+                        "REB": "{:.2f}".format(float(t_reb / total_games)),
+                        "AST": "{:.2f}".format(float(t_ast / total_games)),
+                        "STL": "{:.2f}".format(float(t_stl / total_games)),
+                        "BLK": "{:.2f}".format(float(t_blk / total_games)),
+                        "TO": "{:.2f}".format(float(t_to / total_games)),
+                        "PF": "{:.2f}".format(float(t_pf / total_games))
+                    }
+                }
+            else:
+                # Final response json
+                resp = {
+                    "playingPosition": data["player_grade"],
+                    "improved": True,
+                    "pgs": featured_stats_data,
+                }
+
+            return {"success": True, "data": resp}
+        else:
+            return None
     except Exception:
         print(Exception.with_traceback())
         return {"success": False, "data": {}, "message": "Something went wrong"}
@@ -145,49 +171,49 @@ headers = {
 }
 
 
-def search_athlete(athlete_name, athlete_school, athlete_city, athlete_state):
-    """
-    This function perform the search operation for an athlete. Matches up the given city, school with the one found
-    for returned players. If a match is received, it returns that player's url
-    """
-
-    print(f"\nAth Name: {athlete_name}")
-    print(f"Ath school: {athlete_school}")
-    print(f"Ath city: {athlete_city}")
-
-    params = {
-        'type': 'athlete',
-        'search': f'{athlete_name}',
-        'state': f'{athlete_state}',
-        'gendersport': '',
-    }
-
-    r = requests.get('https://www.maxpreps.com/search/default.aspx', headers=headers, params=params,
-                     cookies=cookies)
-    if r.status_code == 200:
-        r = html.fromstring(r.text)
-        players = r.xpath("//li[@class='row result' and @style='']")
-
-        for player in players:
-            school_name = player.xpath(".//a[@data-js-hook='school-link']/text()")[0]
-            if school_name.lower() in athlete_school.lower():
-                print(f"Schools matched")
-                school_location = player.xpath(".//span[@data-js-hook='school-location']/text()")[0]
-                if "," in school_location:
-                    city_name = school_location.split(",")[0]
-
-                    if city_name.lower() in athlete_city.lower():
-                        print(f"Cities matched")
-                        athlete_url = player.xpath(".//a[@data-js-hook='athlete-link']/@href")[0]
-                        print(f"Ath url: {athlete_url}")
-                        return athlete_url
-                else:
-                    print("No city found")
-                    athlete_url = player.xpath(".//a[@data-js-hook='athlete-link']/@href")[0]
-                    print(f"Ath url: {athlete_url}")
-                    return athlete_url
-    else:
-        print(f"Request to search athlete failed with status {r.status_code}")
+# def search_athlete(athlete_name, athlete_school, athlete_city, athlete_state):
+#     """
+#     This function perform the search operation for an athlete. Matches up the given city, school with the one found
+#     for returned players. If a match is received, it returns that player's url
+#     """
+#
+#     print(f"\nAth Name: {athlete_name}")
+#     print(f"Ath school: {athlete_school}")
+#     print(f"Ath city: {athlete_city}")
+#
+#     params = {
+#         'type': 'athlete',
+#         'search': f'{athlete_name}',
+#         'state': f'{athlete_state}',
+#         'gendersport': '',
+#     }
+#
+#     r = requests.get('https://www.maxpreps.com/search/default.aspx', headers=headers, params=params,
+#                      cookies=cookies)
+#     if r.status_code == 200:
+#         r = html.fromstring(r.text)
+#         players = r.xpath("//li[@class='row result' and @style='']")
+#
+#         for player in players:
+#             school_name = player.xpath(".//a[@data-js-hook='school-link']/text()")[0]
+#             if school_name.lower() in athlete_school.lower():
+#                 print(f"Schools matched")
+#                 school_location = player.xpath(".//span[@data-js-hook='school-location']/text()")[0]
+#                 if "," in school_location:
+#                     city_name = school_location.split(",")[0]
+#
+#                     if city_name.lower() in athlete_city.lower():
+#                         print(f"Cities matched")
+#                         athlete_url = player.xpath(".//a[@data-js-hook='athlete-link']/@href")[0]
+#                         print(f"Ath url: {athlete_url}")
+#                         return athlete_url
+#                 else:
+#                     print("No city found")
+#                     athlete_url = player.xpath(".//a[@data-js-hook='athlete-link']/@href")[0]
+#                     print(f"Ath url: {athlete_url}")
+#                     return athlete_url
+#     else:
+#         print(f"Request to search athlete failed with status {r.status_code}")
 
 
 def get_category_data(url):
@@ -270,28 +296,278 @@ def get_category_data(url):
         print(f"Request to get category failed with status {r.status_code}")
 
 
-def get_athlete_data(athlete_name, athlete_school, athlete_city, athlete_state):
+# def get_athlete_data(athlete_name, athlete_school, athlete_city, athlete_state):
+#     """
+#     This is the MAIN function.
+#
+#     All of the data is gathered and returned as json by this function
+#     """
+#
+#     athlete_url = search_athlete(athlete_name, athlete_school, athlete_city, athlete_state)
+#     print(f"Athlete Url: {athlete_url}")
+#
+#     this_athlete_dict = {}
+#
+#     if athlete_url:
+#         r = requests.get(athlete_url, headers=headers, cookies=cookies)
+#         if r.status_code == 200:
+#             r = html.fromstring(r.text)
+#
+#             this_athlete_dict['player_name'] = athlete_name
+#             this_athlete_dict['player_school'] = athlete_school
+#             this_athlete_dict['player_city'] = athlete_city
+#             this_athlete_dict['player_state'] = athlete_state
+#             this_athlete_dict['player_url'] = athlete_url
+#
+#             try:
+#                 height = r.xpath("//span[@class='height']/text()")[0].strip()
+#             except Exception:
+#                 height = ''
+#             this_athlete_dict['player_height'] = height
+#
+#             try:
+#                 weight = r.xpath("//span[@class='weight']/text()")[0].strip()
+#             except Exception:
+#                 weight = ''
+#             this_athlete_dict['player_weight'] = weight
+#
+#             try:
+#                 grade = r.xpath("//span[@class='grade']/text()")[0].strip()
+#             except Exception:
+#                 grade = ''
+#             this_athlete_dict['player_grade'] = grade
+#
+#             game_categories = r.xpath("//a[@data-la='stats']")
+#             categories_dict = {}
+#             for category in game_categories:
+#                 category_name = category.xpath(".//text()")[0]
+#                 print(f"\nCat name: {category_name}")
+#
+#                 category_url = category.xpath(".//@href")[0]
+#                 category_url = " https://www.maxpreps.com" + category_url
+#                 print(f"Cat url: {category_url}")
+#
+#                 category_data = get_category_data(category_url)
+#
+#                 categories_dict[category_name] = {'seasons': category_data}
+#
+#             this_athlete_dict['games'] = categories_dict
+#
+#         else:
+#             print(f"Request failed to grab data with status {r.status_code}")
+#     else:
+#         print("No match found for this Athlete")
+#
+#     return this_athlete_dict
+
+
+"""
+API to get Team Stats and Roster
+"""
+@app.get("/team/{state}/{name}")
+async def get_team_data(name, state):
+    try:
+        url = f'https://www.maxpreps.com/m/feeds/search.ashx?type=school&search={name}&state={state}&gendersport=boys,basketball'
+        res = requests.get(url)
+        data = json.loads(res.text)
+        team_url = data["response"]["results"][0]["url"]
+        team_basketball_url = team_url + "basketball/"
+        team_roster_url = team_basketball_url + "roster/all-time/"
+        team_staff_url = team_basketball_url + "staff/"
+        team_schedule_url = team_basketball_url + "schedule/"
+        team_schedule_alltime_url = team_basketball_url + "schedule/all-time/"
+
+        # Get Team Stats
+        r = requests.get(team_basketball_url)
+        if r.status_code == 200:
+            #print(r.text)
+            stats = {}
+            r = html.fromstring(r.text)
+            stats["overall"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 qhdev f18_bold']/text()")[0]
+            stats["district"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 qhdev f18_bold']/text()")[1]
+
+            stats["home"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[0]
+            stats["away"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[1]
+            stats["neutral"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[2]
+            stats["pf"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[3]
+            stats["pa"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[4]
+            stats["streak"] = r.xpath("//span[@class='StyledText-sc-yyz0ad-0 RecordDetailsBox__StyledDetailsRow-sc-1n4q0pk-1 doAyHc iFvYoY f11_bold_tall_upper']/span/text()")[5]
+
+        # Get Team Roster and Player info for last 5 seasons
+        r = requests.get(team_roster_url)
+        if r.status_code == 200:
+            # print(r.text)
+            roster = []
+            r = html.fromstring(r.text)
+            seasons = r.xpath("//li[@class='ProgramSeasonContainer__StyledProgramSeasonContainer-sc-c78q6v-0 cApBia']")
+            for season in seasons[0:5]:
+                s = {}
+                s["season"] = season.xpath(".//h2/span[@class='f20_bold']/text()")[0]
+                s["data"] = {}
+                s["data"]["head_coach"] = season.xpath(".//div[@class='StyledText-sc-yyz0ad-0 ePEddr f14_tall']/text()")[1]
+                s["data"]["players"] = []
+                players = season.xpath(".//div[@class='AllTimeRosterPage__StyledAthleteGrid-sc-1dia9se-0 cbYuvw']/span/a[@class='StyledAnchor-sc-jb44mu-0 fudJqG f14_tall']")
+                for player in players:
+                    p = {}
+                    url = player.xpath(".//@href")[0]
+                    name = player.xpath(".//text()")[0]
+                    n = name.split(", ")
+                    p["name"] = n[1] + " " + n[0]
+                    p["info"] = get_player_info(url)
+                    s["data"]["players"].append(p)
+                roster.append(s)
+
+
+        # Get All Time Stats
+        r = requests.get(team_schedule_alltime_url)
+        if r.status_code == 200:
+            all_time = {}
+            r = html.fromstring(r.text)
+            streaks = r.xpath("//table")[0].xpath(".//tbody/tr")
+            all_time["streak"] = []
+            for streak in streaks:
+                s = {}
+                s["start_year"] = streak.xpath(".//td[@class='start first start-year']/text()")
+                s["end_year"] = streak.xpath(".//td[@class='end end-year']/text()")
+                s["streak"] = streak.xpath(".//th[@class='streak last sorted']/text()")
+                all_time["streak"].append(s)
+
+            games = r.xpath("//table")[1].xpath(".//tbody/tr")
+            all_time["games"] = []
+            for game in games:
+                s = {}
+                s["game_type"] = game.xpath(".//th[@class='gametype first sorted']/text()")
+                s["record"] = game.xpath(".//td[@class='record last']/text()")
+                all_time["games"].append(s)
+
+            opponent_games = r.xpath("//table")[2].xpath(".//tbody/tr")
+            all_time["opponent_games"] = []
+            for game in opponent_games:
+                s = {}
+                s["opponent"] = game.xpath(".//th[@class='opponent first']/a/text()")
+                s["record"] = game.xpath(".//td[@class='record sorted']/text()")
+                all_time["opponent_games"].append(s)
+
+        return {"success": True, "data": {"stats": stats, "roster": roster, "all_time": all_time}}
+
+    except Exception:
+        print(Exception.with_traceback())
+        return {"success": False, "data": {}, "message": "Something went wrong"}
+
+
+def get_player_info(url):
     """
-    This is the MAIN function.
-
-    All of the data is gathered and returned as json by this function
+    Function to get player info from URL
+    :param url:
+    :return:
     """
+    try:
+        data = get_athlete_info(url)
 
-    athlete_url = search_athlete(athlete_name, athlete_school, athlete_city, athlete_state)
-    print(f"Athlete Url: {athlete_url}")
+        # Get latest season
+        if "Basketball" in data["games"].keys():
+            latest_season = data["games"]["Basketball"]["seasons"][0]
 
+            # Get featured stats
+            featured_stats = latest_season["featured_stats"]
+
+            # Get featured stats keys
+            featured_stats_keys = list(featured_stats.keys())
+            featured_keys = []
+
+            # Iterate keys and crete abbrevation
+            for stats_key in featured_stats_keys:
+                words = stats_key.split("_")
+                letters = [word[0] for word in words]
+                featured_keys.append(("".join(letters)).upper())
+
+            # Create a dictionary with featured data and abrevated keys
+            featured_stats_data = {}
+
+            for i in range(len(featured_stats_keys)):
+                featured_stats_data[featured_keys[i]] = featured_stats[featured_stats_keys[i]]
+
+            # Get Total Stats
+            stats = latest_season["stats"]
+            for stat in stats:
+                if stat["title"] == "Totals":
+                    total_stats = stat["data"]
+
+            # Calculate average per game by calculation total and divide by total games
+            t_min = 0
+            t_pts = 0
+            t_oreb = 0
+            t_dreb = 0
+            t_reb = 0
+            t_ast = 0
+            t_stl = 0
+            t_blk = 0
+            t_to = 0
+            t_pf = 0
+
+            total_games = 0
+
+            for game in total_stats:
+                t_min += int(game["min"] or 0)
+                t_pts += int(game["pts"] or 0)
+                t_oreb += int(game["oreb"] or 0)
+                t_dreb += int(game["dreb"] or 0)
+                t_reb += int(game["reb"] or 0)
+                t_ast += int(game["ast"] or 0)
+                t_stl += int(game["stl"] or 0)
+                t_blk += int(game["blk"] or 0)
+                t_to += int(game["to"] or 0)
+                t_pf += int(game["pf"] or 0)
+                total_games += 1
+
+            if total_games > 0:
+
+                # Final response json
+                resp = {
+                    "playingPosition": data["player_grade"],
+                    "improved": True,
+                    "pgs": featured_stats_data,
+                    "playersKpis": {
+                        "MIN": "{:.2f}".format(float(t_min / total_games)),
+                        "PTS": "{:.2f}".format(float(t_pts / total_games)),
+                        "OREB": "{:.2f}".format(float(t_oreb / total_games)),
+                        "DREB": "{:.2f}".format(float(t_dreb / total_games)),
+                        "REB": "{:.2f}".format(float(t_reb / total_games)),
+                        "AST": "{:.2f}".format(float(t_ast / total_games)),
+                        "STL": "{:.2f}".format(float(t_stl / total_games)),
+                        "BLK": "{:.2f}".format(float(t_blk / total_games)),
+                        "TO": "{:.2f}".format(float(t_to / total_games)),
+                        "PF": "{:.2f}".format(float(t_pf / total_games))
+                    }
+                }
+            else:
+                # Final response json
+                resp = {
+                    "playingPosition": data["player_grade"],
+                    "improved": True,
+                    "pgs": featured_stats_data,
+                }
+
+            return resp
+        else:
+            return None
+    except Exception:
+        print(Exception.with_traceback())
+        return {"success": False, "data": {}, "message": "Something went wrong"}
+
+
+def get_athlete_info(url):
+    """
+    Helper Function to get athlete info from URL
+    """
     this_athlete_dict = {}
 
-    if athlete_url:
-        r = requests.get(athlete_url, headers=headers, cookies=cookies)
+    if url:
+        r = requests.get(url, headers=headers, cookies=cookies)
         if r.status_code == 200:
             r = html.fromstring(r.text)
 
-            this_athlete_dict['player_name'] = athlete_name
-            this_athlete_dict['player_school'] = athlete_school
-            this_athlete_dict['player_city'] = athlete_city
-            this_athlete_dict['player_state'] = athlete_state
-            this_athlete_dict['player_url'] = athlete_url
+            this_athlete_dict['player_url'] = url
 
             try:
                 height = r.xpath("//span[@class='height']/text()")[0].strip()
@@ -315,11 +591,11 @@ def get_athlete_data(athlete_name, athlete_school, athlete_city, athlete_state):
             categories_dict = {}
             for category in game_categories:
                 category_name = category.xpath(".//text()")[0]
-                print(f"\nCat name: {category_name}")
+                #print(f"\nCat name: {category_name}")
 
                 category_url = category.xpath(".//@href")[0]
                 category_url = " https://www.maxpreps.com" + category_url
-                print(f"Cat url: {category_url}")
+                #print(f"Cat url: {category_url}")
 
                 category_data = get_category_data(category_url)
 
